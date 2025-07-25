@@ -89,6 +89,7 @@ EXTERNAL_SIMDJSON=external/simdjson/
 EXTERNAL_LZMA=external/lzma/
 EXTERNAL_LUA=external/lua/
 EXTERNAL_LIBPCRE2=external/libpcre2/
+EXTERNAL_SIMDJSON=external/simdjson/
 ifneq (${TARGET},winagent)
 EXTERNAL_PROCPS=external/procps/
 EXTERNAL_LIBDB=external/libdb/build_unix/
@@ -876,7 +877,7 @@ endif
 
 # Adding libraries only for server
 ifeq (${TARGET},server)
-	EXTERNAL_LIBS_NO_WHOLE += $(ROCKSDB_LIB) $(SIMDJSON_LIB)
+	EXTERNAL_LIBS_NO_WHOLE += $(ROCKSDB_LIB) $(FLATBUFFERS_LIB) $(SIMDJSON_LIB)
 	EXTERNAL_LIBS += $(LZMA_LIB) $(MINIZIP_LIB)
 endif
 
@@ -1026,6 +1027,7 @@ ${RE2_LIB}: $(ABSEILCPP_LIB)
 	-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 	-DCMAKE_INSTALL_PREFIX=./result && \
 	${MAKE}
+	cd $(EXTERNAL_SIMDJSON) && mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release -DSIMDJSON_DEVELOPER_MODE=OFF -DSIMDJSON_AVX512_ALLOWED=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=1 && ${MAKE}
 
 ### flatbuffers ###
 ${FLATBUFFERS_LIB}:
