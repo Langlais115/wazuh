@@ -244,6 +244,7 @@ typedef struct _logreader {
     unsigned int age;
     char *age_str;
     bool follow_symlink;
+    char *resolved_symlink;
 
     void *(*read)(struct _logreader *lf, int *rc, int drop_it);
 

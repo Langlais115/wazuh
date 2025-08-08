@@ -11,7 +11,6 @@
 #include "shared.h"
 #include "localfile-config.h"
 #include "config.h"
-#include <cstdlib>
 
 #ifdef WAZUH_UNIT_TESTING
 // Remove STATIC qualifier from tests
@@ -565,6 +564,9 @@ int Read_Localfile(XML_NODE node, void *d1, __attribute__((unused)) void *d2)
 
         i++;
     }
+    if (logf[pl].follow_symlink) {
+        logf[pl].resolved_symlink = realpath(logf[pl].file, NULL);
+    }
 
     if (logf[pl].target == NULL) {
         os_calloc(2, sizeof(char*), logf[pl].target);
@@ -591,12 +593,6 @@ int Read_Localfile(XML_NODE node, void *d1, __attribute__((unused)) void *d2)
             os_strdup("", logf[pl].file);
             return (OS_INVALID);
         }
-    }
-
-    if (logf[pl].follow_symlink) {
-        logf[pl].file = realpath(logf[pl].file, NULL);
-    // TODO: error handling
-    
     }
 
     /* Verify journald log config*/

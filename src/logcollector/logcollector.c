@@ -201,7 +201,7 @@ void LogCollectorStart()
     }
 
     /* Initialize status file struct (files_status) and set w_save_file_status at the process exit */
-    w_initialize_file_status();
+    w_initialize_file_status(); // j: this just loads the file status if it exists, and rehashes file contents and offsets and stuff 
 
     if (atexit(w_save_file_status)) {
         merror(ATEXIT_ERROR);
@@ -209,7 +209,7 @@ void LogCollectorStart()
 
     /* Initialize state component */
     if (state_interval == 0) {
-        w_logcollector_state_init(LC_STATE_GLOBAL, false);
+        w_logcollector_state_init(LC_STATE_GLOBAL, false); //j: nothing relevant, just initializing the state structure
     } else if (state_interval > 0) {
         w_logcollector_state_init(LC_STATE_GLOBAL | LC_STATE_INTERVAL, true);
     }
@@ -240,10 +240,10 @@ void LogCollectorStart()
     struct stat tmp_stat;
 
     /* Check for ASCII, UTF-8 */
-    check_text_only();
+    check_text_only(); // j: just checks for files to exclude
 
     /* Set the files mutexes */
-    w_set_file_mutexes();
+    w_set_file_mutexes(); // j: does init the mutex, byt everyhtingn  is at 0, no mention of the file
 #else
     BY_HANDLE_FILE_INFORMATION lpFileInformation;
     memset(&lpFileInformation, 0, sizeof(BY_HANDLE_FILE_INFORMATION));
@@ -289,7 +289,7 @@ void LogCollectorStart()
         if (duplicates_removed == NEXT_IT) {
             i--;
             continue;
-        }
+        } // j: no fd at this point either
 
         if (!current->file) {
             /* Do nothing, duplicated entry */
@@ -430,7 +430,8 @@ void LogCollectorStart()
         }
 
         else if (j < 0) {
-            set_read(current, i, j);
+            set_read(current, i, j); // j: this sets the fd, and also current->read = read_syslog;
+
             if (current->file) {
                 minfo(READING_FILE, current->file);
             }
@@ -471,10 +472,10 @@ void LogCollectorStart()
     }
 
     //Save status localfiles to disk
-    w_save_file_status();
+    w_save_file_status(); // j: this doesnt add the extra symlink
 
     // Initialize message queue's log builder
-    mq_log_builder_init();
+    mq_log_builder_init(); // j: a struct that has the host name
 
     /* Create the output threads */
     w_create_output_threads();
@@ -1022,10 +1023,10 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
      */
 
     /* TODO: Support text mode on Windows */
-    lf->fp = wfopen(lf->file, "rb");
+    lf->fp = wfopen(lf->follow_symlink ? lf->resolved_symlink : lf->file, "rb");
     if (!lf->fp) {
         if (do_log == 1 && lf->exists == 1) {
-            merror(FOPEN_ERROR, lf->file, errno, strerror(errno));
+            merror(FOPEN_ERROR, lf->follow_symlink ? lf->resolved_symlink : lf->file, errno, strerror(errno));
             lf->exists = 0;
         }
         goto error;
@@ -1038,7 +1039,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
     /* Get inode number for fp */
     fd = fileno(lf->fp);
     if (fstat(fd, &stat_fd) == -1) {
-        merror(FSTAT_ERROR, lf->file, errno, strerror(errno));
+        merror(FSTAT_ERROR, lf->follow_symlink ? lf->resolved_symlink : lf->file, errno, strerror(errno));
         fclose(lf->fp);
         lf->fp = NULL;
         goto error;
@@ -1068,7 +1069,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
 #endif
 
     if (find_duplicate_inode(lf)) {
-        mdebug1(DUP_FILE_INODE, lf->file);
+        mdebug1(DUP_FILE_INODE, lf->follow_symlink ? lf->resolved_symlink : lf->file);
         close_file(lf);
         return 0;
     }
@@ -1085,7 +1086,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
             if (offset = w_set_to_pos(lf, 0, SEEK_END), offset < 0) {
                 goto error;
             }
-            w_update_hash_node(lf->file, offset);
+            w_update_hash_node(lf->follow_symlink ? lf->resolved_symlink : lf->file, offset);
         }
     }
 #endif
@@ -1093,6 +1094,22 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
     /* Set ignore to zero */
     lf->ign = 0;
     lf->exists = 1;
+
+    if (lf->follow_symlink) {
+        int64_t offset;
+        FILE* fp = wfopen(lf->file, "rb");
+
+        if (w_fseek(fp, 0, SEEK_END) < 0) {
+            merror(FSEEK_ERROR, lf->file, errno, strerror(errno));
+            fclose(fp);
+            fp = NULL;
+            return -1;
+        }
+
+        offset = w_ftell(fp);
+        w_update_hash_node(lf->file, offset);
+    }
+
     return (0);
 
 error:
@@ -1214,9 +1231,9 @@ void set_read(logreader *current, int i, int j) {
     int tg;
     current->command = NULL;
     current->ign = 0;
-    w_logcollector_state_add_file(current->file);
+    w_logcollector_state_add_file(current->follow_symlink ? current->resolved_symlink : current->file); // j: adds the file with events = 0
     /* Initialize the files */
-    if (current->ffile) {
+    if (current->ffile) { // j: if the file has a string with a date
 
         /* Day must be zero for all files to be initialized */
         _cday = 0;
@@ -1227,11 +1244,11 @@ void set_read(logreader *current, int i, int j) {
         }
 
     } else {
-        handle_file(i, j, 1, 1);
+        handle_file(i, j, 1, 1); // j: opens file and updates status
     }
 
     tg = 0;
-    if (current->target) {
+    if (current->target) { // j: list of targets i think, array with 'agent' on it is all ive seen sofar,  it can have agent or any list of sockets
         while (current->target[tg]) {
             mdebug1("Socket target for '%s' -> %s", current->file, current->target[tg]);
             w_logcollector_state_add_target(current->file, current->target[tg]);
@@ -2079,7 +2096,7 @@ void * w_input_thread(__attribute__((unused)) void * t_id){
                 }
             }
 
-            if (pthread_mutex_trylock(&current->mutex) == 0){
+            if (pthread_mutex_trylock(&current->mutex) == 0){ // j: see WTF we do about this, maybe i can use this mutex for the pointed to file
 
                 if (!current->fp) {
                     /* Run the command */

@@ -130,7 +130,7 @@ int main(int argc, char **argv)
     w_msg_hash_queues_init();
 
     /* Read config file */
-    if (LogCollectorConfig(cfg) < 0) {
+    if (LogCollectorConfig(cfg) < 0) { // j: loads the config file, i dont see the file descriptor being inited or mutext or stuff
         mlerror_exit(LOGLEVEL_ERROR, CONFIG_ERROR, cfg);
     }
 

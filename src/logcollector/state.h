@@ -18,6 +18,7 @@
 #define LOGCOLLECTOR_STATE      "var/run/wazuh-logcollector.state"
 #endif
 
+// j: this state is insdie ossec!!!
 #define LOGCOLLECTOR_STATE_FILES_MAX   40                   ///< Size of the statistics hash table
 #define LOGCOLLECTOR_STATE_DESCRIPTION "logcollector_state" ///< String identifier for errors
 

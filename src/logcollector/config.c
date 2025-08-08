@@ -83,7 +83,7 @@ int LogCollectorConfig(const char *cfgfile)
     }
 #endif
 
-    if (ReadConfig(modules, cfgfile, &log_config, NULL) < 0) {
+    if (ReadConfig(modules, cfgfile, &log_config, NULL) < 0) { // j: i think this just parses the file, it doesnt do anything like reading the filepath or stuff
         return (OS_INVALID);
     }
 
