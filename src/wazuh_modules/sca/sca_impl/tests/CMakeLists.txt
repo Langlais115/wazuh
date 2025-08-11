@@ -1,6 +1,9 @@
 get_filename_component(SRC_FOLDER ${CMAKE_SOURCE_DIR}/../../ ABSOLUTE)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g --coverage")
+if(FSANITIZE)
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address,leak,undefined")
+endif(FSANITIZE)
 
 include_directories(
     ${SRC_FOLDER}/external/googletest/googletest/include/

@@ -273,7 +273,7 @@ def runCppCheck(moduleName):
                       headerKey="cppcheck")
 
     currentDir = utils.moduleDirPath(moduleName)
-    cppcheckCommand = "cppcheck --force --std=c++14 --quiet {}".format(currentDir)
+    cppcheckCommand = "cppcheck --force --std=c++17 --quiet {}".format(currentDir)
 
     out = subprocess.run(cppcheckCommand,
                          stdout=subprocess.PIPE,
@@ -538,7 +538,7 @@ def runTests(moduleName):
     tests = []
     reg = re.compile(".*unit_test|.*unit_test.exe|.*integration_test\
                       |.*interface_test|.*integration_test.exe\
-                      |.*interface_test.exe")
+                      |.*interface_test.exe|.*_test$")
     currentDir = utils.moduleDirPathBuild(moduleName=moduleName)
 
     if not moduleName == "shared_modules/utils":
@@ -661,7 +661,7 @@ def runValgrind(moduleName):
     tests = []
     reg = re.compile(".*unit_test|.*unit_test.exe|.*integration_test\
                      |.*interface_test|.*integration_test.exe\
-                     |.*interface_test.exe")
+                     |.*interface_test.exe|.*_test$")
     currentDir = ""
     if moduleName == "shared_modules/utils":
         currentDir = os.path.join(utils.moduleDirPath(moduleName=moduleName),

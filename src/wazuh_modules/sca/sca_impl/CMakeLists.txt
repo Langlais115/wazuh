@@ -108,6 +108,10 @@ target_include_directories(SCAImpl PUBLIC include PRIVATE src)
 
 target_compile_definitions(SCAImpl PRIVATE PCRE2_CODE_UNIT_WIDTH=8)
 
+if(FSANITIZE)
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address,leak,undefined")
+endif(FSANITIZE)
+
 target_link_libraries(
     SCAImpl
     PRIVATE ${FILESYSTEM_WRAPPER_LIB}
