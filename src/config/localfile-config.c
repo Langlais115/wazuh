@@ -565,7 +565,8 @@ int Read_Localfile(XML_NODE node, void *d1, __attribute__((unused)) void *d2)
         i++;
     }
     if (logf[pl].follow_symlink) {
-        logf[pl].resolved_symlink = realpath(logf[pl].file, NULL);
+        logf[pl].symlink = logf[pl].file;
+        logf[pl].file = realpath(logf[pl].file, NULL);
     }
 
     if (logf[pl].target == NULL) {

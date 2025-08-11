@@ -1012,7 +1012,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
 {
     logreader *lf;
 
-    if (j < 0) {
+    if (j < 0) { // j: j is an index into the glob files, if theres no j, use the global logreader array, else use the globs one
         lf = &logff[i];
     } else {
         lf = &globs[j].gfiles[i];
@@ -1023,10 +1023,10 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
      */
 
     /* TODO: Support text mode on Windows */
-    lf->fp = wfopen(lf->follow_symlink ? lf->resolved_symlink : lf->file, "rb");
+    lf->fp = wfopen(lf->file, "rb");
     if (!lf->fp) {
         if (do_log == 1 && lf->exists == 1) {
-            merror(FOPEN_ERROR, lf->follow_symlink ? lf->resolved_symlink : lf->file, errno, strerror(errno));
+            merror(FOPEN_ERROR, lf->file, errno, strerror(errno));
             lf->exists = 0;
         }
         goto error;
@@ -1039,7 +1039,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
     /* Get inode number for fp */
     fd = fileno(lf->fp);
     if (fstat(fd, &stat_fd) == -1) {
-        merror(FSTAT_ERROR, lf->follow_symlink ? lf->resolved_symlink : lf->file, errno, strerror(errno));
+        merror(FSTAT_ERROR, lf->file, errno, strerror(errno));
         fclose(lf->fp);
         lf->fp = NULL;
         goto error;
@@ -1069,7 +1069,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
 #endif
 
     if (find_duplicate_inode(lf)) {
-        mdebug1(DUP_FILE_INODE, lf->follow_symlink ? lf->resolved_symlink : lf->file);
+        mdebug1(DUP_FILE_INODE, lf->file);
         close_file(lf);
         return 0;
     }
@@ -1086,7 +1086,7 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
             if (offset = w_set_to_pos(lf, 0, SEEK_END), offset < 0) {
                 goto error;
             }
-            w_update_hash_node(lf->follow_symlink ? lf->resolved_symlink : lf->file, offset);
+            w_update_hash_node(lf->file, offset);
         }
     }
 #endif
@@ -1094,21 +1094,6 @@ int handle_file(int i, int j, __attribute__((unused)) int do_fseek, int do_log)
     /* Set ignore to zero */
     lf->ign = 0;
     lf->exists = 1;
-
-    if (lf->follow_symlink) {
-        int64_t offset;
-        FILE* fp = wfopen(lf->file, "rb");
-
-        if (w_fseek(fp, 0, SEEK_END) < 0) {
-            merror(FSEEK_ERROR, lf->file, errno, strerror(errno));
-            fclose(fp);
-            fp = NULL;
-            return -1;
-        }
-
-        offset = w_ftell(fp);
-        w_update_hash_node(lf->file, offset);
-    }
 
     return (0);
 
@@ -1231,7 +1216,7 @@ void set_read(logreader *current, int i, int j) {
     int tg;
     current->command = NULL;
     current->ign = 0;
-    w_logcollector_state_add_file(current->follow_symlink ? current->resolved_symlink : current->file); // j: adds the file with events = 0
+    w_logcollector_state_add_file(current->file); // j: adds the file with events = 0
     /* Initialize the files */
     if (current->ffile) { // j: if the file has a string with a date
 
