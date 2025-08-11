@@ -613,6 +613,23 @@ void LogCollectorStart()
                         break;
                     }
                 }
+                if (current->follow_symlink) { // TODO: see how often we want to do this
+                    if (strcmp(realpath(current->symlink, NULL), current->file) != 0) {
+                        minfo(FORGET_FILE, current->file); // TODO: its not the right message 
+                        os_file_status_t * old_file_status = OSHash_Delete_ex(files_status, current->file);
+                        free_files_status_data(old_file_status);
+                        w_logcollector_state_delete_file(current->file);
+                        fclose(current->fp);
+                        current->fp = NULL;
+                        current->exists = 0;
+                        current->file = realpath(current->symlink, NULL);
+                        set_read(current, i, j);
+                        if (current->file) {
+                            minfo(READING_FILE, current->file);
+                        }
+                    }
+                }
+
 
                 /* These are the windows logs or ignored files */
                 if (!current->file) {
