@@ -257,6 +257,7 @@ typedef struct _logreader_glob {
     char *exclude_path;
     int num_files;
     logreader *gfiles;
+    bool follow_symlink;
 } logreader_glob;
 
 typedef struct _logreader_config {

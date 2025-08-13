@@ -564,10 +564,6 @@ int Read_Localfile(XML_NODE node, void *d1, __attribute__((unused)) void *d2)
 
         i++;
     }
-    if (logf[pl].follow_symlink) {
-        logf[pl].symlink = logf[pl].file;
-        logf[pl].file = realpath(logf[pl].file, NULL);
-    }
 
     if (logf[pl].target == NULL) {
         os_calloc(2, sizeof(char*), logf[pl].target);
@@ -781,6 +777,7 @@ int Read_Localfile(XML_NODE node, void *d1, __attribute__((unused)) void *d2)
                 memcpy(log_config->globs[gl].gfiles, &logf[pl], sizeof(logreader));
                 logf[pl].multiline = NULL; // Prevent freeing the multiline config in Remove_Localfile
                 log_config->globs[gl].gfiles->file = NULL;
+                log_config->globs[gl].follow_symlink = logf[pl].follow_symlink;
             }
 
             /* Wildcard exclusion, check for date */

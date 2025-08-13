@@ -430,6 +430,12 @@ void LogCollectorStart()
         }
 
         else if (j < 0) {
+
+            if (current->follow_symlink) {
+                // TODO: fstat again
+                current->symlink = current->file;
+                current->file = realpath(current->file, NULL);
+            }
             set_read(current, i, j); // j: this sets the fd, and also current->read = read_syslog;
 
             if (current->file) {
@@ -1362,20 +1368,21 @@ int check_pattern_expand(int do_seek) {
                 }
 
                 if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-                    if (!globs[j].gfiles[i].follow_symlink) {
-                        // TODO: fstat again
+                    if (!globs[j].follow_symlink) {
                         mdebug1("File %s is not a regular file. Skipping it.", g.gl_pathv[glob_offset]);
                         glob_offset++;
                         continue;
-                    } else {
-                        // TODO: maybe log symlink expansion
-                        globs[j].gfiles[i].symlink = g.gl_pathv[glob_offset]; 
-                        g.gl_pathv[glob_offset] = realpath(g.gl_pathv[glob_offset], NULL);
                     }
                 }
 
                 found = 0;
                 for (i = 0; globs[j].gfiles[i].file; i++) {
+                    if (globs[j].gfiles[i].follow_symlink) { // TODO unify with stuff below
+                        if (!strcmp(globs[j].gfiles[i].symlink, g.gl_pathv[glob_offset])) {
+                            found = 1;
+                            break;
+                        }
+                    }
                     if (!strcmp(globs[j].gfiles[i].file, g.gl_pathv[glob_offset])) {
                         found = 1;
                         break;
@@ -1405,6 +1412,12 @@ int check_pattern_expand(int do_seek) {
                         current_files++;
                         globs[j].num_files++;
                         mdebug2(CURRENT_FILES, current_files, maximum_files);
+
+                        if (globs[j].gfiles[i].follow_symlink) {
+                            // TODO: fstat again
+                            globs[j].gfiles[i].symlink = globs[j].gfiles[i].file;
+                            globs[j].gfiles[i].file = realpath(globs[j].gfiles[i].file, NULL);
+                        }
                         if  (!globs[j].gfiles[i].read) {
                             set_read(&globs[j].gfiles[i], i, j);
                         } else {
