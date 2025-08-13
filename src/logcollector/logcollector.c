@@ -613,9 +613,9 @@ void LogCollectorStart()
                         break;
                     }
                 }
-                if (current->follow_symlink) { // TODO: see how often we want to do this
+                if (current->follow_symlink) {
                     if (strcmp(realpath(current->symlink, NULL), current->file) != 0) {
-                        minfo(FORGET_FILE, current->file); // TODO: its not the right message 
+                        minfo(NO_LONGER_ANALYZING_FILE, current->file);
                         os_file_status_t * old_file_status = OSHash_Delete_ex(files_status, current->file);
                         free_files_status_data(old_file_status);
                         w_logcollector_state_delete_file(current->file);
@@ -625,7 +625,7 @@ void LogCollectorStart()
                         current->file = realpath(current->symlink, NULL);
                         set_read(current, i, j);
                         if (current->file) {
-                            minfo(READING_FILE, current->file);
+                            minfo(READING_FILE, current->file); // TODO: maybe custom message, see after doing the glob expansion stuff
                         }
                     }
                 }
@@ -1362,9 +1362,16 @@ int check_pattern_expand(int do_seek) {
                 }
 
                 if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-                    mdebug1("File %s is not a regular file. Skipping it.", g.gl_pathv[glob_offset]);
-                    glob_offset++;
-                    continue;
+                    if (!globs[j].gfiles[i].follow_symlink) {
+                        // TODO: fstat again
+                        mdebug1("File %s is not a regular file. Skipping it.", g.gl_pathv[glob_offset]);
+                        glob_offset++;
+                        continue;
+                    } else {
+                        // TODO: maybe log symlink expansion
+                        globs[j].gfiles[i].symlink = g.gl_pathv[glob_offset]; 
+                        g.gl_pathv[glob_offset] = realpath(g.gl_pathv[glob_offset], NULL);
+                    }
                 }
 
                 found = 0;

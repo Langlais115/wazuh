@@ -255,6 +255,7 @@
 #define WPOPENV_ERROR   "(1974): An error ocurred while calling wpopenv(): %s (%d)."
 #define LF_LOG_REGEX    "(1975): Syntax error on regex %s: '%s'"
 #define LF_MATCH_REGEX  "(1976): Ignoring the log line '%s' due to %s config: '%s'"
+#define NO_LONGER_ANALYZING_FILE     "(1977): No longer analyzing file '%s'."
 
 /* Encryption/auth errors */
 #define INVALID_KEY     "(1401): Error reading authentication key: '%s'."
