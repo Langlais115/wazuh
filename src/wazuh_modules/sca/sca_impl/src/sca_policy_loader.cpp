@@ -186,13 +186,16 @@ std::unordered_map<std::string, nlohmann::json> SCAPolicyLoader::SyncWithDBSync(
 
     DBSyncTxn txn {m_dBSync->handle(), nlohmann::json {tableName}, 0, DBSYNC_QUEUE_SIZE, callback};
 
-    nlohmann::json input;
-    input["table"] = tableName;
-    input["data"] = NormalizeDataWithChecksum(data, tableName);
-    input["options"]["return_old_data"] = true;
+    if (txn.handle() != nullptr)
+    {
+        nlohmann::json input;
+        input["table"] = tableName;
+        input["data"] = NormalizeDataWithChecksum(data, tableName);
+        input["options"]["return_old_data"] = true;
 
-    txn.syncTxnRow(input);
-    txn.getDeletedRows(callback);
+        txn.syncTxnRow(input);
+        txn.getDeletedRows(callback);
+    }
 
     return modifiedDataMap;
 }

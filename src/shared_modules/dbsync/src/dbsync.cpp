@@ -816,7 +816,13 @@ DBSyncTxn::DBSyncTxn(const DBSYNC_HANDLE   handle,
             callbackData(result, jsonResult);
         }
     };
-    m_txn = PipelineFactory::instance().create(handle, tables, threadNumber, maxQueueSize, callbackWrapper);
+
+    m_txn = nullptr;
+
+    if (handle != nullptr)
+    {
+        m_txn = PipelineFactory::instance().create(handle, tables, threadNumber, maxQueueSize, callbackWrapper);
+    }
 }
 
 DBSyncTxn::DBSyncTxn(const TXN_HANDLE handle)
