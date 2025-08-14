@@ -1381,6 +1381,11 @@ int check_pattern_expand(int do_seek) {
                     if ((statbuf.st_mode & S_IFMT) == S_IFLNK){
                         if (globs[j].follow_symlink) {
                             char* symlink_realpath = realpath(g.gl_pathv[glob_offset], NULL);
+                            if (!symlink_realpath) {
+                                mwarn(BROKEN_SYMLINK, g.gl_pathv[glob_offset]);
+                                glob_offset++;
+                                continue;
+                            }
                             if (lstat(symlink_realpath , &statbuf) < 0) {
                                 merror(FSTAT_ERROR, symlink_realpath, errno, strerror(errno));
                                 glob_offset++;
@@ -1838,6 +1843,10 @@ static IT_control control_resolve_symlink(logreader *current, int i) {
     if (current->file) {
         current->symlink = current->file;
         current->file = realpath(current->file, NULL);
+        if (!current->file) {
+            mwarn(BROKEN_SYMLINK, current->symlink);
+            return NEXT_IT;
+        }
         struct stat statbuf;
         if (lstat(current->file, &statbuf) < 0) {
             merror(FSTAT_ERROR, current->file, errno, strerror(errno));
