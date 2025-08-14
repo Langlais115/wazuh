@@ -41,7 +41,8 @@ static void check_text_only();
 static int check_pattern_expand(int do_seek);
 static void check_pattern_expand_excluded();
 static void set_can_read(int value);
-static IT_control control_resolve_symlink(logreader *current, int i);
+static void control_resolve_symlink(logreader *current, int i);
+static void update_symlink_state(logreader* current, int i, int j);
 
 /**
  * @brief Releases the data structure stored in the hash table 'files_status'.
@@ -434,15 +435,11 @@ void LogCollectorStart()
 
         else if (j < 0) {
             if (current->follow_symlink) {
-                if (control_resolve_symlink(current, i) == NEXT_IT){
-                    i--;
-                    continue;
-                }
+                control_resolve_symlink(current, i);
             }
 
-            set_read(current, i, j); // j: this sets the fd, and also current->read = read_syslog;
-
             if (current->file) {
+                set_read(current, i, j); // j: this sets the fd, and also current->read = read_syslog;
                 minfo(READING_FILE, current->file);
             }
             /* More tweaks for Windows. For some reason IIS places
@@ -624,22 +621,8 @@ void LogCollectorStart()
                     }
                 }
                 if (current->follow_symlink) {
-                    if (strcmp(realpath(current->symlink, NULL), current->file) != 0) {
-                        minfo(NO_LONGER_ANALYZING_FILE, current->file);
-                        os_file_status_t * old_file_status = OSHash_Delete_ex(files_status, current->file);
-                        free_files_status_data(old_file_status);
-                        w_logcollector_state_delete_file(current->file);
-                        fclose(current->fp);
-                        current->fp = NULL;
-                        current->exists = 0;
-                        current->file = realpath(current->symlink, NULL);
-                        set_read(current, i, j);
-                        if (current->file) {
-                            minfo(READING_FILE, current->file); // TODO: maybe custom message, see after doing the glob expansion stuff
-                        }
-                    }
+                    update_symlink_state(current, i, j); // TODO: see if i and j are needed
                 }
-
 
                 /* These are the windows logs or ignored files */
                 if (!current->file) {
@@ -958,10 +941,8 @@ void LogCollectorStart()
                         continue;
                     }
                     if (current->file && current->follow_symlink && j < 0) {
-                        if (control_resolve_symlink(current, i) == NEXT_IT){
-                            i--;
-                            continue;
-                        }
+                        control_resolve_symlink(current, i);
+                        // TODO: no readFile()?
                     }
                 }
             }
@@ -1838,32 +1819,86 @@ static void set_sockets() {
     }
 }
 
-/* Returns CONTINUE_IT if the symlink was correctly resolved or NEXT_IT if an error occurred resolving it*/
-static IT_control control_resolve_symlink(logreader *current, int i) {
+// NOTE: init symlinks 
+static void control_resolve_symlink(logreader *current, int i) {
     if (current->file) {
         current->symlink = current->file;
         current->file = realpath(current->file, NULL);
         if (!current->file) {
             mwarn(BROKEN_SYMLINK, current->symlink);
-            return NEXT_IT;
+            return;
         }
         struct stat statbuf;
         if (lstat(current->file, &statbuf) < 0) {
             merror(FSTAT_ERROR, current->file, errno, strerror(errno));
-            return NEXT_IT;
+            os_free(current->file);
+            return;
         }
         if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
             mdebug1(SKIP_REGULAR_FILE, current->file);
-            int result = Remove_Localfile(&logff, i, 0, 1,NULL);
-            if (result) {
-                merror_exit(REM_ERROR, current->file);
-            } else {
-                mdebug1(CURRENT_FILES, current_files, maximum_files);
-            }
-            return NEXT_IT;
+            os_free(current->file);
+            return;
         }
     }
-    return CONTINUE_IT;
+}
+
+static void update_symlink_state(logreader* current, int i, int j){
+    char* resolved_symlink = realpath(current->symlink, NULL);
+    if (current->file) {
+        if (resolved_symlink) {
+            if (strcmp(resolved_symlink, current->file) != 0) {
+                minfo(NO_LONGER_ANALYZING_FILE, current->file);
+                os_file_status_t * old_file_status = OSHash_Delete_ex(files_status, current->file);
+                free_files_status_data(old_file_status);
+                w_logcollector_state_delete_file(current->file);
+                fclose(current->fp);
+                current->fp = NULL;
+                current->exists = 0;
+                current->file = resolved_symlink;
+
+                struct stat statbuf;
+                if (lstat(current->file, &statbuf) < 0) { // TODO: maybe p[ut in a function]
+                    merror(FSTAT_ERROR, current->file, errno, strerror(errno));
+                    os_free(current->file);
+                    return;
+                }
+                if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+                    mdebug1(SKIP_REGULAR_FILE, current->file);
+                    os_free(current->file);
+                    return;
+                }
+                set_read(current, i, j);
+                minfo(READING_FILE, current->file); // TODO: maybe custom message, see after doing the glob expansion stuff
+            }
+        } else{
+            mwarn(BROKEN_SYMLINK, current->symlink);
+            os_file_status_t * old_file_status = OSHash_Delete_ex(files_status, current->file);
+            free_files_status_data(old_file_status);
+            w_logcollector_state_delete_file(current->file);
+            fclose(current->fp);
+            current->fp = NULL;
+            current->exists = 0;
+            os_free(current->file);
+        }
+    } else {
+        if (resolved_symlink) {
+            current->file = resolved_symlink;
+            struct stat statbuf;
+            if (lstat(current->file, &statbuf) < 0) { // TODO: maybe p[ut in a function]
+                merror(FSTAT_ERROR, current->file, errno, strerror(errno));
+                os_free(current->file);
+                return;
+            }
+            if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+                mdebug1(SKIP_REGULAR_FILE, current->file);
+                os_free(current->file);
+                return;
+            }
+            current->exists = 1;
+            set_read(current, i, j);
+            minfo(READING_FILE, current->file);
+        }
+    }
 }
 
 void w_set_file_mutexes(){
