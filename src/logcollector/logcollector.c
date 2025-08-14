@@ -8,9 +8,11 @@
  * Foundation
  */
 
+#include "error_messages/error_messages.h"
 #include "shared.h"
 #include "logcollector.h"
 #include "state.h"
+#include <fcntl.h>
 #include <math.h>
 #include <pthread.h>
 #include "sysinfo_utils.h"
@@ -39,6 +41,7 @@ static void check_text_only();
 static int check_pattern_expand(int do_seek);
 static void check_pattern_expand_excluded();
 static void set_can_read(int value);
+static IT_control control_resolve_symlink(logreader *current, int i);
 
 /**
  * @brief Releases the data structure stored in the hash table 'files_status'.
@@ -292,7 +295,7 @@ void LogCollectorStart()
         } // j: no fd at this point either
 
         if (!current->file) {
-            /* Do nothing, duplicated entry */
+        /* Do nothing, duplicated entry */
         } else if (!strcmp(current->logformat, "eventlog")) {
 #ifdef WIN32
 
@@ -430,12 +433,13 @@ void LogCollectorStart()
         }
 
         else if (j < 0) {
-
             if (current->follow_symlink) {
-                // TODO: fstat again
-                current->symlink = current->file;
-                current->file = realpath(current->file, NULL);
+                if (control_resolve_symlink(current, i) == NEXT_IT){
+                    i--;
+                    continue;
+                }
             }
+
             set_read(current, i, j); // j: this sets the fd, and also current->read = read_syslog;
 
             if (current->file) {
@@ -953,6 +957,12 @@ void LogCollectorStart()
                         i--;
                         continue;
                     }
+                    if (current->file && current->follow_symlink && j < 0) {
+                        if (control_resolve_symlink(current, i) == NEXT_IT){
+                            i--;
+                            continue;
+                        }
+                    }
                 }
             }
 
@@ -1362,14 +1372,28 @@ int check_pattern_expand(int do_seek) {
 
                 struct stat statbuf;
                 if (lstat(g.gl_pathv[glob_offset], &statbuf) < 0) {
-                    merror("Error on lstat '%s' due to [(%d)-(%s)]", g.gl_pathv[glob_offset], errno, strerror(errno));
+                    merror(FSTAT_ERROR, g.gl_pathv[glob_offset], errno, strerror(errno));
                     glob_offset++;
                     continue;
                 }
 
                 if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
-                    if (!globs[j].follow_symlink) {
-                        mdebug1("File %s is not a regular file. Skipping it.", g.gl_pathv[glob_offset]);
+                    if ((statbuf.st_mode & S_IFMT) == S_IFLNK){
+                        if (globs[j].follow_symlink) {
+                            char* symlink_realpath = realpath(g.gl_pathv[glob_offset], NULL);
+                            if (lstat(symlink_realpath , &statbuf) < 0) {
+                                merror(FSTAT_ERROR, symlink_realpath, errno, strerror(errno));
+                                glob_offset++;
+                                continue;
+                            }
+                            if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+                                mdebug1(SKIP_REGULAR_FILE, symlink_realpath);
+                                glob_offset++;
+                                continue;
+                            }
+                        }
+                    } else{
+                        mdebug1(SKIP_REGULAR_FILE, g.gl_pathv[glob_offset]);
                         glob_offset++;
                         continue;
                     }
@@ -1377,13 +1401,13 @@ int check_pattern_expand(int do_seek) {
 
                 found = 0;
                 for (i = 0; globs[j].gfiles[i].file; i++) {
-                    if (globs[j].gfiles[i].follow_symlink) { // TODO unify with stuff below
-                        if (!strcmp(globs[j].gfiles[i].symlink, g.gl_pathv[glob_offset])) {
-                            found = 1;
-                            break;
-                        }
+                    char* path;
+                    if (globs[j].gfiles[i].follow_symlink) {
+                        path = globs[j].gfiles[i].symlink;
+                    } else {
+                        path = globs[j].gfiles[i].file;
                     }
-                    if (!strcmp(globs[j].gfiles[i].file, g.gl_pathv[glob_offset])) {
+                    if (!strcmp(path, g.gl_pathv[glob_offset])) {
                         found = 1;
                         break;
                     }
@@ -1414,9 +1438,9 @@ int check_pattern_expand(int do_seek) {
                         mdebug2(CURRENT_FILES, current_files, maximum_files);
 
                         if (globs[j].gfiles[i].follow_symlink) {
-                            // TODO: fstat again
                             globs[j].gfiles[i].symlink = globs[j].gfiles[i].file;
                             globs[j].gfiles[i].file = realpath(globs[j].gfiles[i].file, NULL);
+                            // TODO: realpath fails after 40 loops
                         }
                         if  (!globs[j].gfiles[i].read) {
                             set_read(&globs[j].gfiles[i], i, j);
@@ -1656,6 +1680,7 @@ int check_pattern_expand(int do_seek) {
 }
 #endif
 
+
 static IT_control remove_duplicates(logreader *current, int i, int j) {
     IT_control d_control = CONTINUE_IT;
     IT_control f_control;
@@ -1806,6 +1831,30 @@ static void set_sockets() {
             }
         }
     }
+}
+
+/* Returns CONTINUE_IT if the symlink was correctly resolved or NEXT_IT if an error occurred resolving it*/
+static IT_control control_resolve_symlink(logreader *current, int i) {
+    if (current->file) {
+        current->symlink = current->file;
+        current->file = realpath(current->file, NULL);
+        struct stat statbuf;
+        if (lstat(current->file, &statbuf) < 0) {
+            merror(FSTAT_ERROR, current->file, errno, strerror(errno));
+            return NEXT_IT;
+        }
+        if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
+            mdebug1(SKIP_REGULAR_FILE, current->file);
+            int result = Remove_Localfile(&logff, i, 0, 1,NULL);
+            if (result) {
+                merror_exit(REM_ERROR, current->file);
+            } else {
+                mdebug1(CURRENT_FILES, current_files, maximum_files);
+            }
+            return NEXT_IT;
+        }
+    }
+    return CONTINUE_IT;
 }
 
 void w_set_file_mutexes(){

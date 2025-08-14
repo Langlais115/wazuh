@@ -256,6 +256,7 @@
 #define LF_LOG_REGEX    "(1975): Syntax error on regex %s: '%s'"
 #define LF_MATCH_REGEX  "(1976): Ignoring the log line '%s' due to %s config: '%s'"
 #define NO_LONGER_ANALYZING_FILE     "(1977): No longer analyzing file '%s'."
+#define SKIP_REGULAR_FILE            "(1978): File %s is not a regular file. Skipping it."
 
 /* Encryption/auth errors */
 #define INVALID_KEY     "(1401): Error reading authentication key: '%s'."
