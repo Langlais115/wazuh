@@ -354,7 +354,7 @@ void save_controlmsg(const keyentry * key, char *r_msg, size_t msg_length, int *
 
     if (is_shutdown == 0) {
         /* Reply to the agent except on shutdown message*/
-        snprintf(msg_ack, OS_FLSIZE, "%s%s", CONTROL_HEADER, HC_ACK);
+        snprintf(msg_ack, OS_FLSIZE, "%s%s", CONTROL_HEADER, HC_ACK); /// Aqui ejemplo de mensaje que se manda en rta al agente.
         if (send_msg(key->id, msg_ack, -1) >= 0) {
             rem_inc_send_ack(key->id);
         }
