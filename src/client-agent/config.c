@@ -108,6 +108,10 @@ cJSON *getClientConfig(void) {
     cJSON_AddNumberToObject(client,"ip_update_interval",agt->main_ip_update_interval);
     if (agt->flags.auto_restart) cJSON_AddStringToObject(client,"auto_restart","yes"); else cJSON_AddStringToObject(client,"auto_restart","no");
     if (agt->flags.remote_conf) cJSON_AddStringToObject(client,"remote_conf","yes"); else cJSON_AddStringToObject(client,"remote_conf","no");
+    if (agt->crypto_method == W_METH_BLOWFISH)
+        cJSON_AddStringToObject(client,"crypto_method","blowfish"); // Deprecated option (blowfish), keep it for old agent compatibility
+    else if (agt->crypto_method == W_METH_AES)
+        cJSON_AddStringToObject(client,"crypto_method","aes");
     if (agt->server) {
         cJSON *servers = cJSON_CreateArray();
         for (i=0;agt->server[i].rip;i++) {
@@ -121,7 +125,7 @@ cJSON *getClientConfig(void) {
             cJSON_AddNumberToObject(server, "max_retries", agt->server[i].max_retries);
             cJSON_AddNumberToObject(server, "retry_interval", agt->server[i].retry_interval);
 
-            if (agt->server[i].protocol == IPPROTO_UDP) cJSON_AddStringToObject(server,"protocol","udp"); else cJSON_AddStringToObject(server,"protocol","tcp");
+            if (agt->server[i].protocol == IPPROTO_UDP) cJSON_AddStringToObject(server,"protocol","udp"); else cJSON_AddStringToObject(server,"protocol","tcp");  // Deprecated option (udp), keep it for old agent compatibility
             cJSON_AddItemToArray(servers,server);
         }
         cJSON_AddItemToObject(client,"server",servers);

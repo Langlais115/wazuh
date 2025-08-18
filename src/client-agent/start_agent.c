@@ -59,7 +59,7 @@ bool connect_server(int server_id, bool verbose)
                 minfo("Closing connection to server ([%s]:%d/%s).",
                     agt->server[agt->rip_id].rip,
                     agt->server[agt->rip_id].port,
-                    agt->server[agt->rip_id].protocol == IPPROTO_UDP ? "udp" : "tcp");
+                    "tcp");
             }
         }
     }
@@ -91,13 +91,10 @@ bool connect_server(int server_id, bool verbose)
         minfo("Trying to connect to server ([%s]:%d/%s).",
             agt->server[server_id].rip,
             agt->server[server_id].port,
-            agt->server[server_id].protocol == IPPROTO_UDP ? "udp" : "tcp");
+            "tcp");
     }
-    if (agt->server[server_id].protocol == IPPROTO_UDP) {
-        agt->sock = OS_ConnectUDP(agt->server[server_id].port, ip_address, strchr(ip_address, ':') != NULL ? 1 : 0, agt->server[server_id].network_interface);
-    } else {
-        agt->sock = OS_ConnectTCP(agt->server[server_id].port, ip_address, strchr(ip_address, ':') != NULL ? 1 : 0, agt->server[server_id].network_interface);
-    }
+
+    agt->sock = OS_ConnectTCP(agt->server[server_id].port, ip_address, strchr(ip_address, ':') != NULL ? 1 : 0, agt->server[server_id].network_interface);
 
     if (agt->sock < 0) {
         agt->sock = -1;
@@ -233,12 +230,7 @@ static void w_agentd_keys_init (void) {
 
     /* Set the crypto method for the agent */
     os_set_agent_crypto_method(&keys,agt->crypto_method);
-
-    switch (agt->crypto_method) {
-        case W_METH_AES:
-            minfo("Using AES as encryption method.");
-            break;
-    }
+    minfo("Using AES as encryption method.");
 }
 
 /**
